@@ -57,7 +57,7 @@ jobs:
           TF_VAR_proxmox_token_secret: ${{ secrets.PROXMOX_TOKEN_SECRET }}
         run: |
           terraform init
-          terraform apply -auto-approve
+          terraform apply -parallelism=3 -auto-approve
 
       - name: Run Ansible Playbook (Idempotent Configuration)
         working-directory: ansible
