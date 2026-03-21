@@ -13,6 +13,15 @@
           - s3_root_password is defined
         fail_msg: "FATAL: One or more required secrets are missing from the workflow environment!"
 
+- name: WAIT FOR VMs TO BOOT
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Wait for SSH to become available (Waiting for Cloud-Init)
+      wait_for_connection:
+        delay: 10
+        timeout: 120
+
 - name: PHASE 1 - Prepare Base System & Docker
   hosts: all
   become: true
