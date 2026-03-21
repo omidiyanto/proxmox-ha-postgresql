@@ -22,9 +22,3 @@
   community.docker.docker_compose_v2:
     project_src: /opt/haproxy
     state: present
-
-# Handlers untuk me-restart kontainer JIKA haproxy.cfg berubah
-- name: Restart HAProxy
-  community.docker.docker_compose_v2:
-    project_src: /opt/haproxy
-    state: restarted
