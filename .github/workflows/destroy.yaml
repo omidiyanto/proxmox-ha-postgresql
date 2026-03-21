@@ -1,4 +1,4 @@
-name: Destroy
+name: Danger - Destroy Cluster
 on: workflow_dispatch
 jobs:
   destroy:
@@ -6,11 +6,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Inject HCP Terraform Config via Secrets
-        working-directory: terraform
+      - name: Inject Dynamic Secrets (Placeholders)
         run: |
-          sed -i "s/__HCP_ORG__/${{ secrets.HCP_ORG }}/g" versions.tf
-          sed -i "s/__HCP_WORKSPACE__/${{ secrets.HCP_WORKSPACE }}/g" versions.tf
+          sed -i "s/__HCP_ORG__/${{ secrets.HCP_ORG }}/g" terraform/versions.tf
+          sed -i "s/__HCP_WORKSPACE__/${{ secrets.HCP_WORKSPACE }}/g" terraform/versions.tf
+
+      - name: Setup SSH Public Key (Decode Base64)
+        run: |
+          {
+            echo 'TF_VAR_ssh_public_key<<EOF'
+            echo "${{ secrets.SSH_PUBLIC_KEY_B64 }}" | base64 --decode
+            echo EOF
+          } >> "$GITHUB_ENV"
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -22,7 +29,6 @@ jobs:
           TF_VAR_proxmox_api_url: ${{ secrets.PROXMOX_API_URL }}
           TF_VAR_proxmox_token_id: ${{ secrets.PROXMOX_TOKEN_ID }}
           TF_VAR_proxmox_token_secret: ${{ secrets.PROXMOX_TOKEN_SECRET }}
-          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
         run: |
           terraform init
           terraform destroy -auto-approve

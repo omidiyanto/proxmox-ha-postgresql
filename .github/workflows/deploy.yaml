@@ -1,4 +1,4 @@
-name: Deploy
+name: Deploy HA PostgreSQL (Strict GitOps)
 
 on:
   push:
@@ -22,10 +22,18 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
 
-      - name: Setup SSH Key for Proxmox Bastion & Target VMs
+      - name: Setup SSH Keys (Decode Base64)
         run: |
+          # 1. Decode Private Key untuk koneksi SSH/Bastion
           echo "${{ secrets.SSH_PRIVATE_KEY_B64 }}" | base64 --decode > /tmp/ssh_key
           chmod 600 /tmp/ssh_key
+          
+          # 2. Decode Public Key dan masukkan ke GITHUB_ENV agar bisa dibaca Terraform
+          {
+            echo 'TF_VAR_ssh_public_key<<EOF'
+            echo "${{ secrets.SSH_PUBLIC_KEY_B64 }}" | base64 --decode
+            echo EOF
+          } >> "$GITHUB_ENV"
 
       - name: Inject Dynamic Secrets (Placeholders)
         run: |
@@ -47,7 +55,6 @@ jobs:
           TF_VAR_proxmox_api_url: ${{ secrets.PROXMOX_API_URL }}
           TF_VAR_proxmox_token_id: ${{ secrets.PROXMOX_TOKEN_ID }}
           TF_VAR_proxmox_token_secret: ${{ secrets.PROXMOX_TOKEN_SECRET }}
-          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
         run: |
           terraform init
           terraform apply -auto-approve
