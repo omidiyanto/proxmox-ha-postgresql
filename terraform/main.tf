@@ -27,8 +27,9 @@ module "pg_cluster" {
   memory_mb = each.value.ram
   disk_size = each.value.disk
 
-  ip_address = "${each.value.ip}/24"
-  gateway    = "192.168.0.1"
+  ip_address  = "${each.value.ip}/24"
+  gateway     = "192.168.0.1"
+  dns_servers = ["8.8.8.8"]
 
   ssh_public_keys = [var.ssh_public_key]
 }
