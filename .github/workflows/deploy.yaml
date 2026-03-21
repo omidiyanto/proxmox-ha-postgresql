@@ -1,0 +1,73 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+      - 'ansible/**'
+
+jobs:
+  deploy-cluster:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Connect to Tailscale (Bastion Proxy)
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Setup SSH Key for Proxmox Bastion & Target VMs
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY_B64 }}" | base64 --decode > /tmp/ssh_key
+          chmod 600 /tmp/ssh_key
+
+      - name: Inject Dynamic Secrets (Placeholders)
+        run: |
+          # Inject HCP Terraform Config
+          sed -i "s/__HCP_ORG__/${{ secrets.HCP_ORG }}/g" terraform/versions.tf
+          sed -i "s/__HCP_WORKSPACE__/${{ secrets.HCP_WORKSPACE }}/g" terraform/versions.tf
+          
+          # Inject Ansible Bastion Hostname
+          sed -i "s/__PROXMOX_TAILSCALE_HOSTNAME__/${{ secrets.PROXMOX_TAILSCALE_HOSTNAME }}/g" ansible/ansible.cfg
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform Init & Apply (Idempotent Infra)
+        working-directory: terraform
+        env:
+          TF_VAR_proxmox_api_url: ${{ secrets.PROXMOX_API_URL }}
+          TF_VAR_proxmox_token_id: ${{ secrets.PROXMOX_TOKEN_ID }}
+          TF_VAR_proxmox_token_secret: ${{ secrets.PROXMOX_TOKEN_SECRET }}
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Run Ansible Playbook (Idempotent Configuration)
+        working-directory: ansible
+        env:
+          ANSIBLE_CONFIG: ./ansible.cfg
+          ANSIBLE_HOST_KEY_CHECKING: False 
+        run: |
+          ansible-galaxy collection install community.general
+          
+          ansible-playbook playbook.yaml \
+            -e "patroni_cluster_name=${{ secrets.PATRONI_CLUSTER_NAME }}" \
+            -e "postgres_password=${{ secrets.POSTGRES_PASSWORD }}" \
+            -e "pgpassword_admin=${{ secrets.PGPASSWORD_ADMIN }}" \
+            -e "pgpassword_standby=${{ secrets.PGPASSWORD_STANDBY }}" \
+            -e "etcd_root_password=${{ secrets.ETCD_ROOT_PASSWORD }}" \
+            -e "etcd_cluster_token=${{ secrets.ETCD_CLUSTER_TOKEN }}" \
+            -e "s3_bucket_name=${{ secrets.S3_BUCKET_NAME }}" \
+            -e "s3_root_user=${{ secrets.S3_ROOT_USER }}" \
+            -e "s3_root_password=${{ secrets.S3_ROOT_PASSWORD }}" \
+            -e "haproxy_password=${{ secrets.HAPROXY_PASSWORD }}"
