@@ -14,3 +14,24 @@
     name: ubuntu
     groups: docker
     append: yes
+
+- name: Disable Cloud-Init manage_etc_hosts to prevent overwrite
+  lineinfile:
+    path: /etc/cloud/cloud.cfg
+    regexp: '^manage_etc_hosts:'
+    line: 'manage_etc_hosts: false'
+    state: present
+
+- name: Remove 127.0.1.1 local resolution loopback
+  lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1'
+    state: absent
+
+- name: Build /etc/hosts cluster topology dynamically
+  lineinfile:
+    path: /etc/hosts
+    regexp: '^.*?\s+{{ item }}$'
+    line: "{{ hostvars[item]['ansible_host'] }} {{ item }}"
+    state: present
+  loop: "{{ groups['all'] }}"
