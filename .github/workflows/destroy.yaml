@@ -6,6 +6,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Connect to Tailscale (Bastion Proxy)
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      
       - name: Inject Dynamic Secrets (Placeholders)
         run: |
           sed -i "s/__HCP_ORG__/${{ secrets.HCP_ORG }}/g" terraform/versions.tf
