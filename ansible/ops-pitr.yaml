@@ -34,14 +34,6 @@
         path: /home/postgres/pgdata/pgroot
         state: absent
 
-    - name: Recreate empty data directory (ALL NODES)
-      file:
-        path: /home/postgres/pgdata
-        state: directory
-        owner: 999
-        group: 999
-        mode: '0700'
-
     - name: Clear Patroni state from etcd (Run on Node 01)
       command: >
         docker compose -f /opt/etcd/docker-compose.yaml exec -T etcd etcdctl

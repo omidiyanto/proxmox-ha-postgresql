@@ -1,4 +1,8 @@
 # JINJA MAGIC: Template KHUSUS untuk Point-In-Time Recovery (PITR)
+{% set etcd_ips = [] %}
+{% for host in groups['database'] + groups['witness'] %}
+{%   set _ = etcd_ips.append(hostvars[host]['ansible_host'] ~ ':31079') %}
+{% endfor %}
 {% set is_master = (inventory_hostname == groups['database'][0]) %}
 {% set kp_state = 'MASTER' if is_master else 'BACKUP' %}
 
@@ -9,7 +13,7 @@ services:
     network_mode: "host"
     environment:
       TZ: Asia/Jakarta
-      ETCD3_HOSTS: "{{ etcd_hosts_string }}"
+      ETCD3_HOSTS: "{{ etcd_ips | join(',') }}"
       SCOPE: "{{ patroni_cluster_name }}"
       NAME: "{{ inventory_hostname }}"
       PGPASSWORD_SUPERUSER: "{{ postgres_password }}"
@@ -23,8 +27,8 @@ services:
       CLONE_WAL_S3_BUCKET: "{{ s3_bucket_name }}"
       CLONE_AWS_ACCESS_KEY_ID: "{{ s3_root_user }}"
       CLONE_AWS_SECRET_ACCESS_KEY: "{{ s3_root_password }}"
-      CLONE_AWS_ENDPOINT: "http://{{ hostvars['rustfs']['ansible_host'] }}:9000"
-      CLONE_WALE_S3_ENDPOINT: "http+path://{{ hostvars['rustfs']['ansible_host'] }}:9000"
+      CLONE_AWS_ENDPOINT: "http://{{ hostvars[groups['backup'][0]]['ansible_host'] }}:9000"
+      CLONE_WALE_S3_ENDPOINT: "http+path://{{ hostvars[groups['backup'][0]]['ansible_host'] }}:9000"
       # ====================================================
 
       SPILO_CONFIGURATION: |
