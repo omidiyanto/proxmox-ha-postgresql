@@ -1,0 +1,56 @@
+# JINJA MAGIC: Template KHUSUS untuk Point-In-Time Recovery (PITR)
+{% set is_master = (inventory_hostname == groups['database'][0]) %}
+{% set kp_state = 'MASTER' if is_master else 'BACKUP' %}
+
+services:
+  patroni:
+    image: ghcr.io/zalando/spilo-15:3.2-p1
+    container_name: patroni
+    network_mode: "host"
+    environment:
+      TZ: Asia/Jakarta
+      ETCD3_HOSTS: "{{ etcd_hosts_string }}"
+      SCOPE: "{{ patroni_cluster_name }}"
+      NAME: "{{ inventory_hostname }}"
+      PGPASSWORD_SUPERUSER: "{{ postgres_password }}"
+      PGPASSWORD_ADMIN: "{{ pgpassword_admin }}"
+      PGPASSWORD_STANDBY: "{{ pgpassword_standby }}"
+
+      # ======= FOR RECOVERY ONLY ========================
+      CLONE_METHOD: "CLONE_WITH_WALE"
+      CLONE_SCOPE: "{{ patroni_cluster_name }}"
+      CLONE_TARGET_TIME: "{{ recovery_target_time }}"
+      CLONE_WAL_S3_BUCKET: "{{ s3_bucket_name }}"
+      CLONE_AWS_ACCESS_KEY_ID: "{{ s3_root_user }}"
+      CLONE_AWS_SECRET_ACCESS_KEY: "{{ s3_root_password }}"
+      CLONE_AWS_ENDPOINT: "http://{{ hostvars['rustfs']['ansible_host'] }}:9000"
+      CLONE_WALE_S3_ENDPOINT: "http+path://{{ hostvars['rustfs']['ansible_host'] }}:9000"
+      # ====================================================
+
+      SPILO_CONFIGURATION: |
+        bootstrap:
+          dcs:
+            postgresql:
+              parameters:
+                password_encryption: scram-sha-256
+          initdb:
+            - auth: scram-sha-256
+            - encoding: UTF8
+            - data-checksums
+        postgresql:
+          pg_hba:
+            - local     all         postgres                               peer
+            - local     all         all                                    trust
+            - local     replication standby                                trust
+            - host      replication standby     all                        scram-sha-256
+            - host      all         all         127.0.0.1/32               scram-sha-256
+            - host      all         all         ::1/128                    scram-sha-256
+            - host      all         all         all                        scram-sha-256
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - pg_data:/home/postgres/pgdata
+    restart: always
+
+# PgBouncer should be disable while recovery process is on-going
+volumes:
+  pg_data:

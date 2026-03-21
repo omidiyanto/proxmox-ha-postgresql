@@ -1,0 +1,92 @@
+---
+- name: Day-2 Ops - Point In Time Recovery (Disaster Recovery)
+  hosts: database
+  become: true
+  gather_facts: false
+  vars:
+    etcd_hosts_string: "{% for host in groups['witness'] + groups['database'] %}http://{{ hostvars[host]['ansible_host'] }}:31079{% if not loop.last %},{% endif %}{% endfor %}"
+
+  tasks:
+    - name: Ensure target_time is provided
+      fail:
+        msg: "You have to define input variables 'target_time' (ex: '2026-03-22T01:21:00+07:00')"
+      when: target_time is not defined
+
+    - name: Announce the apocalypse
+      debug:
+        msg: "INITIATING PITR RECOVERY TO TARGET TIME: {{ target_time }}..."
+      run_once: true
+
+    - name: Teardown Patroni and wipe physical data (ALL NODES)
+      command: docker compose down -v
+      args:
+        chdir: /opt/patroni
+      ignore_errors: true 
+
+    - name: Wipe out physical PostgreSQL data (ALL NODES)
+      file:
+        path: /home/postgres/pgdata/pgroot
+        state: absent
+
+    - name: Recreate empty data directory (ALL NODES)
+      file:
+        path: /home/postgres/pgdata
+        state: directory
+        owner: 999
+        group: 999
+        mode: '0700'
+
+    - name: Clear Patroni state from etcd (Run on Node 01)
+      command: >
+        docker compose -f /opt/etcd/docker-compose.yaml exec -T etcd etcdctl
+        --endpoints={{ etcd_hosts_string }} del --prefix /service/{{ patroni_cluster_name }}
+      when: inventory_hostname == groups['database'][0]
+      register: etcd_wipe
+      changed_when: etcd_wipe.stdout | int > 0
+
+    - name: Render Recovery docker-compose.yaml on Node 01
+      template:
+        src: roles/patroni/templates/docker-compose-recovery.yaml.j2
+        dest: /opt/patroni/docker-compose-recovery.yaml
+      when: inventory_hostname == groups['database'][0]
+      vars:
+        recovery_target_time: "{{ target_time }}"
+
+    - name: Start Patroni in Recovery Mode on Node 01
+      command: docker compose -f docker-compose-recovery.yaml up -d
+      args:
+        chdir: /opt/patroni
+      when: inventory_hostname == groups['database'][0]
+
+    - name: Wait until Node 01 successfully recovers and becomes Leader
+      command: docker compose -f docker-compose-recovery.yaml exec -T patroni patronictl list --format json
+      args:
+        chdir: /opt/patroni
+      register: patroni_status
+      until: >
+        (patroni_status.stdout | from_json | selectattr('Member', 'equalto', inventory_hostname) | map(attribute='Role') | first | default('')) == 'Leader'
+      retries: 60  
+      delay: 10
+      when: inventory_hostname == groups['database'][0]
+
+    - name: Announce Recovery Success
+      debug:
+        msg: "RECOVERY COMPLETE! Node 01 is now the Leader."
+      when: inventory_hostname == groups['database'][0]
+
+    - name: Stop Recovery Container on Node 01 (Do NOT wipe volumes!)
+      command: docker compose -f docker-compose-recovery.yaml down
+      args:
+        chdir: /opt/patroni
+      when: inventory_hostname == groups['database'][0]
+
+    - name: Delete Recovery YAML File
+      file:
+        path: /opt/patroni/docker-compose-recovery.yaml
+        state: absent
+      when: inventory_hostname == groups['database'][0]
+
+    - name: Start Patroni using Normal YAML (ALL NODES)
+      command: docker compose up -d
+      args:
+        chdir: /opt/patroni
