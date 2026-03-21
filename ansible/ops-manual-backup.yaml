@@ -1,0 +1,57 @@
+---
+- name: Day-2 Ops - Manual Base Backup to S3
+  hosts: database
+  become: true
+  gather_facts: false
+  
+  tasks:
+    - name: Fetch current Patroni cluster state
+      command: docker compose exec -T patroni patronictl list --format json
+      args:
+        chdir: /opt/patroni
+      register: patroni_state
+      changed_when: false
+      run_once: true
+
+    - name: Identify the current Leader node
+      set_fact:
+        leader_node: "{{ (patroni_state.stdout | from_json) | selectattr('Role', 'equalto', 'Leader') | map(attribute='Member') | first }}"
+      run_once: true
+
+    - name: Skip backup execution on Replicas
+      debug:
+        msg: "This node ({{ inventory_hostname }}) is a Replica. Skipping execution. The backup will be triggered on the Leader ({{ leader_node }})."
+      when: inventory_hostname != leader_node
+
+    - name: Announce backup initialization
+      debug:
+        msg: "Initializing Full Base Backup to S3 (RustFS) from Leader node: {{ leader_node }}..."
+      when: inventory_hostname == leader_node
+
+    - name: Execute WAL-G full base backup
+      command: >
+        docker compose exec -T patroni bash -c
+        "su postgres -c 'PGHOST=/var/run/postgresql PGPORT=32432 envdir /run/etc/wal-e.d/env wal-g backup-push /home/postgres/pgdata/pgroot/data'"
+      args:
+        chdir: /opt/patroni
+      register: backup_result
+      when: inventory_hostname == leader_node
+      # Base backups can take a while depending on DB size, increasing timeout slightly just in case
+      async: 3600
+      poll: 10
+
+    - name: Display WAL-G backup execution logs (stdout)
+      debug:
+        var: backup_result.stdout_lines
+      when: 
+        - inventory_hostname == leader_node
+        - backup_result.stdout_lines is defined
+        - backup_result.stdout_lines | length > 0
+
+    - name: Display WAL-G backup execution logs (stderr)
+      debug:
+        var: backup_result.stderr_lines
+      when: 
+        - inventory_hostname == leader_node
+        - backup_result.stderr_lines is defined
+        - backup_result.stderr_lines | length > 0
