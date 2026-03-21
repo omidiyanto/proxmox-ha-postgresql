@@ -1,12 +1,12 @@
 name: Deploy HA PostgreSQL Cluster
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - master
-    paths:
-      - 'terraform/**'
-      - 'ansible/**'
+  # push:
+  #   branches:
+  #     - master
+  #   paths:
+  #     - 'terraform/**'
+  #     - 'ansible/**'
 
 jobs:
   deploy-cluster:
