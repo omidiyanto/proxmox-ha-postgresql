@@ -1,3 +1,9 @@
+# JINJA MAGIC: Merakit string IP etcd dengan aman
+{% set etcd_ips = [] %}
+{% for host in groups['database'] + groups['witness'] %}
+{%   set _ = etcd_ips.append(hostvars[host]['ansible_host'] ~ ':31079') %}
+{% endfor %}
+
 services:
   patroni:
     image: ghcr.io/zalando/spilo-15:3.2-p1
@@ -5,8 +11,7 @@ services:
     network_mode: "host"
     environment:
       TZ: Asia/Jakarta
-      # Auto-generate ETCD Hosts from inventory
-      ETCD3_HOSTS: "{% for host in groups['database'] + groups['witness'] %}{{ hostvars[host]['ansible_host'] }}:31079{% if not loop.last %},{% endif %}{% endfor %}"
+      ETCD3_HOSTS: "{{ etcd_ips | join(',') }}"
       SCOPE: "{{ patroni_cluster_name }}"
       NAME: "{{ inventory_hostname }}"
       PGPASSWORD_SUPERUSER: "{{ postgres_password }}"
@@ -20,7 +25,6 @@ services:
       USE_WALG_BACKUP: "true"
       USE_WALG_RESTORE: "true"
       
-      # S3 Auto-Discovery (mencari IP dari node backup secara otomatis)
       WAL_S3_BUCKET: "{{ s3_bucket_name }}"
       AWS_ACCESS_KEY_ID: "{{ s3_root_user }}"
       AWS_SECRET_ACCESS_KEY: "{{ s3_root_password }}"
@@ -70,7 +74,7 @@ services:
       - DB_PASSWORD={{ postgres_password }}
       - AUTH_TYPE=scram-sha-256
       - AUTH_USER=postgres
-      - AUTH_QUERY=SELECT usename, passwd FROM pg_shadow WHERE usename=$1
+      - AUTH_QUERY=SELECT usename, passwd FROM pg_shadow WHERE usename=$$1
       - LISTEN_PORT=32046
       - POOL_MODE=transaction
       - MAX_CLIENT_CONN=2000
