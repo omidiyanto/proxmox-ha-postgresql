@@ -1,3 +1,9 @@
+# JINJA MAGIC: Merakit string cluster dengan aman sebelum merender YAML
+{% set etcd_nodes = [] %}
+{% for host in groups['database'] + groups['witness'] %}
+{%   set _ = etcd_nodes.append(host ~ '=http://' ~ hostvars[host]['ansible_host'] ~ ':30278') %}
+{% endfor %}
+
 services:
   etcd:
     image: bitnamilegacy/etcd:3.6.1
@@ -12,12 +18,16 @@ services:
       - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:31079
       - ETCD_ADVERTISE_CLIENT_URLS=http://{{ ansible_host }}:31079
       - ETCD_INITIAL_CLUSTER_TOKEN={{ etcd_cluster_token }}
-      # JINJA MAGIC: Auto-generate cluster topology
-      - ETCD_INITIAL_CLUSTER={% for host in groups['database'] + groups['witness'] %}{{ host }}=http://{{ hostvars[host]['ansible_host'] }}:30278{% if not loop.last %},{% endif %}{% endfor %}
+      - ETCD_INITIAL_CLUSTER={{ etcd_nodes | join(',') }}
     volumes:
       - etcd_data:/bitnami/etcd
       - /etc/localtime:/etc/localtime:ro
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "etcdctl --endpoints=http://{{ ansible_host }}:31079 endpoint health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
 
 volumes:
   etcd_data:
