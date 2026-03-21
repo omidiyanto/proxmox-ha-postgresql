@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       target_node:
-        description: 'Input node name to be promote as leader (ex: node01)'
+        description: 'Input node name to be promoted as leader (ex: patroni01)'
         required: true
         type: string
 
@@ -27,8 +27,10 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY_B64 }}" | base64 --decode > /tmp/ssh_key
           chmod 600 /tmp/ssh_key
 
-      - name: Inject Ansible Bastion Hostname
+      - name: Inject Dynamic Secrets (Placeholders)
         run: |
+          sed -i "s/__HCP_ORG__/${{ secrets.HCP_ORG }}/g" terraform/versions.tf
+          sed -i "s/__HCP_WORKSPACE__/${{ secrets.HCP_WORKSPACE }}/g" terraform/versions.tf
           sed -i "s/__PROXMOX_TAILSCALE_HOSTNAME__/${{ secrets.PROXMOX_TAILSCALE_HOSTNAME }}/g" ansible/ansible.cfg
 
       - name: Setup Terraform
@@ -50,6 +52,6 @@ jobs:
         working-directory: ansible
         env:
           ANSIBLE_CONFIG: ./ansible.cfg
-          ANSIBLE_HOST_KEY_CHECKING: False 
+          ANSIBLE_HOST_KEY_CHECKING: False
         run: |
           ansible-playbook ops-switchover.yaml -e "target_node=${{ github.event.inputs.target_node }}"
