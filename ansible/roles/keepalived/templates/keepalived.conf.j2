@@ -1,14 +1,24 @@
+{% set is_master = (inventory_hostname == groups['loadbalancer'][0]) %}
+{% set kp_state = 'MASTER' if is_master else 'BACKUP' %}
+{% set kp_priority = '101' if is_master else '100' %}
+
+global_defs {
+    script_user root
+    enable_script_security
+}
+
 vrrp_script chk_haproxy {
     script "/usr/bin/curl -s http://127.0.0.1:7000/ > /dev/null"
     interval 2
     weight 2
+    user root
 }
 
 vrrp_instance VI_1 {
     interface eth0
-    state {% if inventory_hostname == groups['loadbalancer'][0] %}MASTER{% else %}BACKUP{% endif %}
+    state {{ kp_state }}
     virtual_router_id 51
-    priority {% if inventory_hostname == groups['loadbalancer'][0] %}101{% else %}100{% endif %}
+    priority {{ kp_priority }}
     advert_int 1
     
     authentication {
