@@ -67,7 +67,7 @@ jobs:
         run: |
           ansible-galaxy collection install community.general
           
-          ansible-playbook playbook.yaml \
+          ansible-playbook playbook.yaml --fork=100 \
             -e "patroni_cluster_name=${{ secrets.PATRONI_CLUSTER_NAME }}" \
             -e "postgres_password=${{ secrets.POSTGRES_PASSWORD }}" \
             -e "pgpassword_admin=${{ secrets.PGPASSWORD_ADMIN }}" \
