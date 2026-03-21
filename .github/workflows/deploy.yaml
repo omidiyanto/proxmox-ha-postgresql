@@ -1,5 +1,5 @@
 name: Deploy HA PostgreSQL (Strict GitOps)
-
+on: workflow_dispatch
 on:
   push:
     branches:
