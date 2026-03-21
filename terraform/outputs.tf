@@ -5,7 +5,7 @@ output "cluster_nodes" {
   }
 }
 output "ansible_inventory_raw" {
-  description = "Raw YAML Inventory for Ansible
+  description = "Raw YAML Inventory for Ansible"
   value       = local_file.ansible_inventory.content
   sensitive   = true
 }
