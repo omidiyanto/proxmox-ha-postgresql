@@ -1,0 +1,16 @@
+---
+- name: Set Timezone to Asia/Jakarta
+  community.general.timezone:
+    name: Asia/Jakarta
+
+- name: Ensure Docker service is running
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Add ubuntu user to docker group
+  user:
+    name: ubuntu
+    groups: docker
+    append: yes

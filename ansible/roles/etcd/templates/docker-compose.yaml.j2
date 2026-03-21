@@ -1,0 +1,23 @@
+services:
+  etcd:
+    image: bitnamilegacy/etcd:3.6.1
+    container_name: etcd
+    network_mode: "host"
+    environment:
+      - TZ=Asia/Jakarta
+      - ETCD_NAME={{ inventory_hostname }}
+      - ETCD_ROOT_PASSWORD={{ etcd_root_password }}
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://{{ ansible_host }}:30278
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:30278
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:31079
+      - ETCD_ADVERTISE_CLIENT_URLS=http://{{ ansible_host }}:31079
+      - ETCD_INITIAL_CLUSTER_TOKEN={{ etcd_cluster_token }}
+      # JINJA MAGIC: Auto-generate cluster topology
+      - ETCD_INITIAL_CLUSTER={% for host in groups['database'] + groups['witness'] %}{{ host }}=http://{{ hostvars[host]['ansible_host'] }}:30278{% if not loop.last %},{% endif %}{% endfor %}
+    volumes:
+      - etcd_data:/bitnami/etcd
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+
+volumes:
+  etcd_data:

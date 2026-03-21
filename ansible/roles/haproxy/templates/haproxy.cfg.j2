@@ -1,0 +1,33 @@
+global
+    maxconn 10000
+
+defaults
+    mode tcp
+    option clitcpka
+    option srvtcpka
+    timeout client  1h
+    timeout server  1h
+    timeout connect 10s
+    retries 3
+
+listen stats
+    mode http
+    bind *:7000
+    stats enable
+    stats uri /
+    stats refresh 5s
+    stats auth admin:{{ haproxy_password }}
+
+frontend postgres_primary
+    bind *:5432
+    default_backend patroni_master
+
+backend patroni_master
+    option httpchk GET /master
+    http-check expect status 200
+    default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions
+    
+    # Auto-generate dari inventory database
+{% for host in groups['database'] %}
+    server {{ host }} {{ hostvars[host]['ansible_host'] }}:32046 maxconn 2000 check port 30008
+{% endfor %}

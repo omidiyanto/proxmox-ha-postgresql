@@ -1,0 +1,24 @@
+---
+- name: Create ETCD directory
+  file:
+    path: /opt/etcd
+    state: directory
+    mode: '0755'
+
+- name: Render ETCD docker-compose.yaml
+  template:
+    src: docker-compose.yaml.j2
+    dest: /opt/etcd/docker-compose.yaml
+    mode: '0644'
+
+- name: Apply ETCD Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: /opt/etcd
+    state: present
+
+- name: Wait for ETCD Client port to be available
+  wait_for:
+    host: "{{ ansible_host }}"
+    port: 31079
+    delay: 3
+    timeout: 60

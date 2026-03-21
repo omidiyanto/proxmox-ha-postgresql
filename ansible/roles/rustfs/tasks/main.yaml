@@ -1,0 +1,24 @@
+---
+- name: Create RustFS directory
+  file:
+    path: /opt/rustfs
+    state: directory
+    mode: '0755'
+
+- name: Render RustFS docker-compose.yaml
+  template:
+    src: docker-compose.yaml.j2
+    dest: /opt/rustfs/docker-compose.yaml
+    mode: '0644'
+
+- name: Apply RustFS Docker Compose (State-Driven)
+  community.docker.docker_compose_v2:
+    project_src: /opt/rustfs
+    state: present
+
+- name: Wait for RustFS S3 API to become healthy
+  wait_for:
+    host: 127.0.0.1
+    port: 9000
+    delay: 5
+    timeout: 60

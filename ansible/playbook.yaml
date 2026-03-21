@@ -1,0 +1,45 @@
+---
+- name: STRICT VALIDATION - Check Required Variables
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Assert all required secrets are provided by GHA
+      assert:
+        that:
+          - patroni_cluster_name is defined
+          - postgres_password is defined
+          - etcd_root_password is defined
+          - s3_root_password is defined
+        fail_msg: "FATAL: One or more required secrets are missing from the workflow environment!"
+
+- name: PHASE 1 - Prepare Base System & Docker
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - common
+
+- name: PHASE 2 - Deploy RustFS (S3 Backup)
+  hosts: backup
+  become: true
+  roles:
+    - rustfs
+
+- name: PHASE 3 - Deploy etcd Cluster
+  hosts: database, witness
+  become: true
+  roles:
+    - etcd
+
+- name: PHASE 4 - Deploy Patroni & PgBouncer
+  hosts: database
+  become: true
+  roles:
+    - patroni
+
+- name: PHASE 5 - Deploy HAProxy Entrypoint
+  hosts: witness
+  become: true
+  roles:
+    - haproxy

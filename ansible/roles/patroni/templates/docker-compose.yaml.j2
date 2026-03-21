@@ -1,0 +1,84 @@
+services:
+  patroni:
+    image: ghcr.io/zalando/spilo-15:3.2-p1
+    container_name: patroni
+    network_mode: "host"
+    environment:
+      TZ: Asia/Jakarta
+      # Auto-generate ETCD Hosts from inventory
+      ETCD3_HOSTS: "{% for host in groups['database'] + groups['witness'] %}{{ hostvars[host]['ansible_host'] }}:31079{% if not loop.last %},{% endif %}{% endfor %}"
+      SCOPE: "{{ patroni_cluster_name }}"
+      NAME: "{{ inventory_hostname }}"
+      PGPASSWORD_SUPERUSER: "{{ postgres_password }}"
+      PGPASSWORD_ADMIN: "{{ pgpassword_admin }}"
+      PGPASSWORD_STANDBY: "{{ pgpassword_standby }}"
+      
+      PGPORT: 32432
+      APIPORT: 30008
+      BACKUP_SCHEDULE: "00 01 * * *"
+      WALG_DELTA_MAX_STEPS: "6"
+      USE_WALG_BACKUP: "true"
+      USE_WALG_RESTORE: "true"
+      
+      # S3 Auto-Discovery (mencari IP dari node backup secara otomatis)
+      WAL_S3_BUCKET: "{{ s3_bucket_name }}"
+      AWS_ACCESS_KEY_ID: "{{ s3_root_user }}"
+      AWS_SECRET_ACCESS_KEY: "{{ s3_root_password }}"
+      AWS_ENDPOINT: "http://{{ hostvars[groups['backup'][0]]['ansible_host'] }}:9000"
+      WALE_S3_ENDPOINT: "http+path://{{ hostvars[groups['backup'][0]]['ansible_host'] }}:9000"
+      AWS_S3_FORCE_PATH_STYLE: "true"
+      WALE_DISABLE_S3_SSE: "true"
+      WALG_DISABLE_S3_SSE: "true"
+      
+      CRONTAB: '["00 02 * * * su postgres -c ''envdir /run/etc/wal-e.d/env wal-g delete retain FULL 7 --confirm''"]'
+      
+      SPILO_CONFIGURATION: |
+        bootstrap:
+          dcs:
+            postgresql:
+              parameters:
+                password_encryption: scram-sha-256
+          initdb:
+            - auth: scram-sha-256
+            - encoding: UTF8
+            - data-checksums
+        postgresql:
+          pg_hba:
+            - local     all         postgres                               peer
+            - local     all         all                                    trust
+            - local     replication standby                                trust
+            - host      replication standby     all                        scram-sha-256
+            - host      all         all         127.0.0.1/32               scram-sha-256
+            - host      all         all         ::1/128                    scram-sha-256
+            - host      all         all         all                        scram-sha-256
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - pg_data:/home/postgres/pgdata
+    restart: always
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: pgbouncer
+    network_mode: "host"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - TZ=Asia/Jakarta
+      - DB_HOST={{ ansible_host }}
+      - DB_PORT=32432
+      - DB_USER=postgres
+      - DB_PASSWORD={{ postgres_password }}
+      - AUTH_TYPE=scram-sha-256
+      - AUTH_USER=postgres
+      - AUTH_QUERY=SELECT usename, passwd FROM pg_shadow WHERE usename=$1
+      - LISTEN_PORT=32046
+      - POOL_MODE=transaction
+      - MAX_CLIENT_CONN=2000
+      - DEFAULT_POOL_SIZE=50
+      - IGNORE_STARTUP_PARAMETERS=extra_float_digits
+    depends_on:
+      - patroni
+    restart: always
+
+volumes:
+  pg_data:

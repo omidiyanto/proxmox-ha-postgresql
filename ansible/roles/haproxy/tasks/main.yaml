@@ -1,0 +1,30 @@
+---
+- name: Create HAProxy directory
+  file:
+    path: /opt/haproxy
+    state: directory
+    mode: '0755'
+
+- name: Render HAProxy configuration
+  template:
+    src: haproxy.cfg.j2
+    dest: /opt/haproxy/haproxy.cfg
+    mode: '0644'
+  notify: Restart HAProxy
+
+- name: Render HAProxy docker-compose
+  template:
+    src: docker-compose.yaml.j2
+    dest: /opt/haproxy/docker-compose.yaml
+    mode: '0644'
+
+- name: Apply HAProxy Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: /opt/haproxy
+    state: present
+
+# Handlers untuk me-restart kontainer JIKA haproxy.cfg berubah
+- name: Restart HAProxy
+  community.docker.docker_compose_v2:
+    project_src: /opt/haproxy
+    state: restarted
