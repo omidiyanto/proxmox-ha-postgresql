@@ -1,12 +1,12 @@
 name: Deploy HA PostgreSQL (Strict GitOps)
 on: workflow_dispatch
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'terraform/**'
-      - 'ansible/**'
+# on:
+#   push:
+#     branches:
+#       - main
+#     paths:
+#       - 'terraform/**'
+#       - 'ansible/**'
 
 jobs:
   deploy-cluster:
