@@ -22,14 +22,14 @@
         delay: 10
         timeout: 120
 
-- name: PHASE 1 - Prepare Base System & Docker
+- name: PHASE 1 - Preparation
   hosts: all
   become: true
   gather_facts: true
   roles:
     - common
 
-- name: PHASE 2 - Deploy RustFS (S3 Backup)
+- name: PHASE 2 - Deploy RustFS (S3 Backup Server)
   hosts: backup
   become: true
   roles:
@@ -47,8 +47,9 @@
   roles:
     - patroni
 
-- name: PHASE 5 - Deploy HAProxy Entrypoint
-  hosts: witness
+- name: PHASE 5 - Deploy HA Load Balancer (HAProxy & Keepalived)
+  hosts: loadbalancer
   become: true
   roles:
     - haproxy
+    - keepalived

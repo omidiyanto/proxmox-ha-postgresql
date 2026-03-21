@@ -5,12 +5,14 @@ provider "proxmox" {
 }
 
 locals {
-  # Definisi seluruh spesifikasi node (Hardcoded in code as Source of Truth)
+  haproxy_vip = "192.168.0.250"
   nodes = {
-    "node01" = { id = 211, ip = "192.168.0.211", cores = 2, ram = 2048, disk = 30,  group = "database" }
-    "node02" = { id = 212, ip = "192.168.0.212", cores = 2, ram = 2048, disk = 30,  group = "database" }
-    "node03" = { id = 213, ip = "192.168.0.213", cores = 1, ram = 1024, disk = 20,  group = "witness" }
-    "node04" = { id = 214, ip = "192.168.0.214", cores = 2, ram = 2048, disk = 50, group = "backup" }
+    "patroni01" = { id = 211, ip = "192.168.0.211", cores = 2, ram = 2048, disk = 30, group = "database" }
+    "patroni02" = { id = 212, ip = "192.168.0.212", cores = 2, ram = 2048, disk = 30, group = "database" }
+    "witness"   = { id = 213, ip = "192.168.0.213", cores = 1, ram = 512,  disk = 20, group = "witness" }
+    "lb01"      = { id = 214, ip = "192.168.0.214", cores = 1, ram = 1024, disk = 20, group = "loadbalancer" }
+    "lb02"      = { id = 215, ip = "192.168.0.215", cores = 1, ram = 1024, disk = 20, group = "loadbalancer" }
+    "rustfs"    = { id = 216, ip = "192.168.0.216", cores = 2, ram = 2048, disk = 50, group = "backup" }
   }
 }
 
@@ -48,6 +50,12 @@ resource "local_file" "ansible_inventory" {
         database = { hosts = { for k, v in local.nodes : k => {} if v.group == "database" } }
         witness  = { hosts = { for k, v in local.nodes : k => {} if v.group == "witness" } }
         backup   = { hosts = { for k, v in local.nodes : k => {} if v.group == "backup" } }
+        loadbalancer = {
+          hosts = { for k, v in local.nodes : k => {} if v.group == "loadbalancer" }
+          vars = {
+            vip_address = local.haproxy_vip
+          }
+        }
       }
     }
   })

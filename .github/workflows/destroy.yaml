@@ -1,4 +1,4 @@
-name: Danger - Destroy Cluster
+name: Destroy Cluster
 on: workflow_dispatch
 jobs:
   destroy:
