@@ -3,13 +3,19 @@
   hosts: database
   become: true
   gather_facts: false
+  # SANGAT KRUSIAL: Hentikan seluruh node jika satu node gagal!
+  any_errors_fatal: true
+
   vars:
     etcd_hosts_string: "{% for host in groups['witness'] + groups['database'] %}http://{{ hostvars[host]['ansible_host'] }}:31079{% if not loop.last %},{% endif %}{% endfor %}"
 
   tasks:
+    # ---------------------------------------------------------
+    # TAHAP 1: PEMUSNAHAN TOTAL (NUKE THE SCENE)
+    # ---------------------------------------------------------
     - name: Ensure target_time is provided
       fail:
-        msg: "You have to define input variables 'target_time' (ex: '2026-03-22T01:21:00+07:00')"
+        msg: "Anda harus mendefinisikan variabel 'target_time' (misal: '2026-03-22T01:21:00+07:00')"
       when: target_time is not defined
 
     - name: Announce the apocalypse
@@ -21,7 +27,7 @@
       command: docker compose down -v
       args:
         chdir: /opt/patroni
-      ignore_errors: true 
+      ignore_errors: true
 
     - name: Wipe out physical PostgreSQL data (ALL NODES)
       file:
@@ -42,8 +48,11 @@
         --endpoints={{ etcd_hosts_string }} del --prefix /service/{{ patroni_cluster_name }}
       when: inventory_hostname == groups['database'][0]
       register: etcd_wipe
-      changed_when: etcd_wipe.stdout | int > 0
+      changed_when: false
 
+    # ---------------------------------------------------------
+    # TAHAP 2: PROSES RECOVERY (HANYA DI NODE 01)
+    # ---------------------------------------------------------
     - name: Render Recovery docker-compose.yaml on Node 01
       template:
         src: roles/patroni/templates/docker-compose-recovery.yaml.j2
@@ -59,21 +68,28 @@
       when: inventory_hostname == groups['database'][0]
 
     - name: Wait until Node 01 successfully recovers and becomes Leader
-      command: docker compose -f docker-compose-recovery.yaml exec -T patroni patronictl list --format json
+      # Pengecekan via Plain Text jauh lebih aman daripada JSON saat proses booting
+      command: docker compose -f docker-compose-recovery.yaml exec -T patroni patronictl list
       args:
         chdir: /opt/patroni
       register: patroni_status
-      until: >
-        (patroni_status.stdout | from_json | selectattr('Member', 'equalto', inventory_hostname) | map(attribute='Role') | first | default('')) == 'Leader'
-      retries: 60  
+      until:
+        - patroni_status.rc == 0
+        - "'Leader' in patroni_status.stdout"
+        - "inventory_hostname in patroni_status.stdout"
+      retries: 90  # Waktu tunggu diperpanjang hingga 15 menit
       delay: 10
       when: inventory_hostname == groups['database'][0]
+      changed_when: false
 
     - name: Announce Recovery Success
       debug:
         msg: "RECOVERY COMPLETE! Node 01 is now the Leader."
       when: inventory_hostname == groups['database'][0]
 
+    # ---------------------------------------------------------
+    # TAHAP 3: NORMALISASI KLASTER
+    # ---------------------------------------------------------
     - name: Stop Recovery Container on Node 01 (Do NOT wipe volumes!)
       command: docker compose -f docker-compose-recovery.yaml down
       args:
