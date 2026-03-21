@@ -1,0 +1,55 @@
+name: Ops - DB Switchover
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_node:
+        description: 'Input node name to be promote as leader (ex: node01)'
+        required: true
+        type: string
+
+jobs:
+  switchover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Connect to Tailscale (Bastion Proxy)
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Setup SSH Keys (Decode Base64)
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY_B64 }}" | base64 --decode > /tmp/ssh_key
+          chmod 600 /tmp/ssh_key
+
+      - name: Inject Ansible Bastion Hostname
+        run: |
+          sed -i "s/__PROXMOX_TAILSCALE_HOSTNAME__/${{ secrets.PROXMOX_TAILSCALE_HOSTNAME }}/g" ansible/ansible.cfg
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Fetch Dynamic Inventory (Read-Only)
+        working-directory: terraform
+        env:
+          TF_VAR_proxmox_api_url: ${{ secrets.PROXMOX_API_URL }}
+          TF_VAR_proxmox_token_id: ${{ secrets.PROXMOX_TOKEN_ID }}
+          TF_VAR_proxmox_token_secret: ${{ secrets.PROXMOX_TOKEN_SECRET }}
+        run: |
+          terraform init
+          terraform output -raw ansible_inventory_raw > ../ansible/inventory.yaml
+
+      - name: Run Switchover Playbook
+        working-directory: ansible
+        env:
+          ANSIBLE_CONFIG: ./ansible.cfg
+          ANSIBLE_HOST_KEY_CHECKING: False 
+        run: |
+          ansible-playbook ops-switchover.yaml -e "target_node=${{ github.event.inputs.target_node }}"

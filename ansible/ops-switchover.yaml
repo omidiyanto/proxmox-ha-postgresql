@@ -1,0 +1,38 @@
+---
+- name: Day-2 Ops - Patroni Switchover
+  hosts: database[0]
+  become: true
+  gather_facts: false
+  
+  tasks:
+    - name: Fetch current Patroni cluster state
+      command: docker compose exec -T patroni patronictl list --format json
+      args:
+        chdir: /opt/patroni
+      register: patroni_state
+      changed_when: false
+
+    - name: Parse current Leader from JSON
+      set_fact:
+        current_leader: "{{ (patroni_state.stdout | from_json) | selectattr('Role', 'equalto', 'Leader') | map(attribute='Member') | first }}"
+
+    - name: IDEMPOTENCY CHECK - Is target already the Leader?
+      meta: end_play
+      when: current_leader == target_node
+
+    - name: Print Switchover Execution Intent
+      debug:
+        msg: "Executing Switchover: Demoting '{{ current_leader }}' and Promoting '{{ target_node }}'..."
+      when: current_leader != target_node
+
+    - name: Execute Switchover
+      command: docker compose exec -T patroni patronictl switchover --master {{ current_leader }} --candidate {{ target_node }} --force
+      args:
+        chdir: /opt/patroni
+      register: switchover_result
+      when: current_leader != target_node
+
+    - name: Print Switchover Result
+      debug:
+        var: switchover_result.stdout_lines
+      when: current_leader != target_node
