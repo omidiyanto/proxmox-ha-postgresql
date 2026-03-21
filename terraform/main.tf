@@ -36,7 +36,7 @@ module "pg_cluster" {
   ssh_public_keys = [var.ssh_public_key]
 }
 
-# Auto-generate Ansible Inventory dalam format YAML standar
+# Auto-generate Ansible Inventory
 resource "local_file" "ansible_inventory" {
   content = yamlencode({
     all = {
