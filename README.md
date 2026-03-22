@@ -198,7 +198,7 @@ This project is open-source, and I strongly believe in the power of community co
 
 ### 🚀 Ways to Contribute
 * 🐛 **Report Bugs:** Pipeline failed? Proxmox template issues? Open an Issue and include your GitHub Actions run logs (please redact any secrets!).
-* ✨ **Feature Requests:** Have ideas to make this GitOps pipeline even more robust? Let's discuss it in the Issues section.
+* ✨ **Feature Requests:** Have ideas to make this GitOps pipeline even more robust? or change the WAL-G to Barman? Let's discuss it in the Issues section.
 * 📖 **Documentation:** Spot a typo, broken link, or have a clearer way to explain the Tailscale integration? PRs are always welcome.
 
 ### 🛠️ Pull Request Workflow
