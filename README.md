@@ -139,7 +139,7 @@ Once the pipeline completes successfully, you can access your highly available d
 psql -U postgres -d postgres -h 192.168.0.250 -p 5432
 ```
 ```bash
-root@patroni01:/opt/patroni# docker compose exec -it patroni psql -U postgres -h 192.168.0.250 -d postgres -p 5432
+root@patroni01:/opt/patroni# docker exec -it patroni psql -U postgres -h 192.168.0.250 -d postgres -p 5432
 Password for user postgres:
 psql (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
 Type "help" for help.
@@ -156,6 +156,20 @@ postgres=# \l
 (3 rows)
 
 postgres=#
+```
+
+**Check postgresql cluster with patroni:**
+```bash
+docker exec -it patroni patronictl list
+```
+```bash
+root@patroni01:/opt/patroni# docker exec -it patroni patronictl list
++ Cluster: pgcluster (7619702173493006407) -+-----------+----+-----------+
+| Member    | Host                | Role    | State     | TL | Lag in MB |
++-----------+---------------------+---------+-----------+----+-----------+
+| patroni01 | 192.168.0.211:32432 | Leader  | running   |  8 |           |
+| patroni02 | 192.168.0.212:32432 | Replica | streaming |  8 |         0 |
++-----------+---------------------+---------+-----------+----+-----------+
 ```
 
 **Check RustFS (S3) Dashboard:**
