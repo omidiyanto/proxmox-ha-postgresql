@@ -190,6 +190,9 @@ Disaster strikes? Accidental `DROP TABLE`? You can rewind your entire PostgreSQL
 4. Click **Run workflow**. 
 5. *The pipeline will automatically stop the current cluster, restore the base backup from S3, replay the transactions up to your exact target time, and bring the HA cluster back online.*
 
+
+**Note**: If replica node is stuck in 'archive recovery' state, you should do reinit the node by `docker exec -it patroni patronictl reinit pgcluster NODE_NAME`
+
 ---
 
 ## 🤝 How to Contribute
@@ -207,8 +210,6 @@ This project is open-source, and I strongly believe in the power of community co
 3. Make your changes. **Crucial:** Ensure your Terraform code is formatted (`terraform fmt`) and your Ansible tasks maintain **strict idempotency**.
 4. Commit with a clear, descriptive message.
 5. Push to your fork and submit a **Pull Request** against the `master` branch.
-
-**Note**: If replica node is stuck in 'archive recovery' state, you should do reinit the node by `docker exec -it patroni patronictl reinit pgcluster NODE_NAME`
 
 ### 🛡️ Development Guidelines
 * **No Secrets in Code:** Never hardcode IPs, passwords, or Tailscale/Proxmox tokens. Always rely on Terraform variables and GitHub Secrets.
