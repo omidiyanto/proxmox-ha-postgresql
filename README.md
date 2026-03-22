@@ -162,3 +162,55 @@ postgres=#
 Open `http://<RUSTFS_NODE_IP>:9001` in your browser to verify WAL-G continuous archiving.
 
 ---
+
+## 🛠️ Day-2 Operations (Zero-Touch Ops with GitOps)
+
+This project strictly adheres to **Zero-Touch Provisioning**. You do not need to SSH into any servers or run manual CLI commands to manage your database. All operational tasks are securely automated and can be triggered directly from the GitHub Actions UI.
+
+To perform any of the following operations, navigate to the **Actions** tab in this GitHub repository.
+
+### 1. Graceful Database Switchover
+If you need to rotate the Leader node (e.g., for maintenance) with zero data loss, you can trigger a graceful switchover. HAProxy will automatically detect the role change and reroute traffic in milliseconds.
+1. In the Actions menu, select **Ops - DB Switchover**.
+2. Click on **Run workflow**.
+3. Input the **Target Node** you want to promote as the new leader (e.g., `patroni01` or `patroni02`).
+4. Click **Run workflow**.
+
+### 2. Manual / Ad-Hoc Base Backup
+Your cluster continuously archives WAL files to RustFS (S3). However, if you need to force a fresh, full base backup (e.g., before deploying a major application update):
+1. In the Actions menu, select **Ops - Manual S3 Base Backup**.
+2. Click on **Run workflow** and confirm.
+3. Ansible will securely instruct WAL-G to deduplicate and push the latest data blocks directly to your S3 bucket.
+
+### 3. Point-in-Time Recovery (PITR)
+Disaster strikes? Accidental `DROP TABLE`? You can rewind your entire PostgreSQL cluster to a specific fraction of a second in the past using the WAL-G archives stored in S3.
+1. In the Actions menu, select **Ops - Disaster Recovery (PITR)**.
+2. Click on **Run workflow**.
+3. Input the **Target Time** to recover using the ISO8601 format (e.g., `2026-03-22T01:21:00+07:00`).
+4. Click **Run workflow**. 
+5. *The pipeline will automatically stop the current cluster, restore the base backup from S3, replay the transactions up to your exact target time, and bring the HA cluster back online.*
+
+---
+
+## 🤝 How to Contribute
+
+This project is open-source, and I strongly believe in the power of community collaboration! Whether you are fixing an Ansible idempotency bug, improving the documentation, or proposing a massive architectural upgrade (like adding external AWS S3 support), your contributions are highly appreciated.
+
+### 🚀 Ways to Contribute
+* 🐛 **Report Bugs:** Pipeline failed? Proxmox template issues? Open an Issue and include your GitHub Actions run logs (please redact any secrets!).
+* ✨ **Feature Requests:** Have ideas to make this GitOps pipeline even more robust? Let's discuss it in the Issues section.
+* 📖 **Documentation:** Spot a typo, broken link, or have a clearer way to explain the Tailscale integration? PRs are always welcome.
+
+### 🛠️ Pull Request Workflow
+1. **Fork** the repository and **Clone** it locally.
+2. Create a new branch for your feature or bugfix: `git checkout -b feature/your-awesome-feature`
+3. Make your changes. **Crucial:** Ensure your Terraform code is formatted (`terraform fmt`) and your Ansible tasks maintain **strict idempotency**.
+4. Commit with a clear, descriptive message.
+5. Push to your fork and submit a **Pull Request** against the `master` branch.
+
+**Note**: If replica node is stuck in 'archive recovery' state, you should do reinit the node by `docker exec -it patroni patronictl reinit pgcluster NODE_NAME`
+
+### 🛡️ Development Guidelines
+* **No Secrets in Code:** Never hardcode IPs, passwords, or Tailscale/Proxmox tokens. Always rely on Terraform variables and GitHub Secrets.
+* **Idempotency is Key:** The pipeline must be able to run 100 times consecutively without breaking or unintentionally restarting existing infrastructure.
+---
