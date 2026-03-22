@@ -33,6 +33,7 @@ services:
 
       SPILO_CONFIGURATION: |
         bootstrap:
+          post_init: /bin/true
           dcs:
             postgresql:
               parameters:
