@@ -3,6 +3,62 @@
   community.general.timezone:
     name: Asia/Jakarta
 
+- name: Check if Docker is installed
+  stat:
+    path: /usr/bin/docker
+  register: docker_stat
+
+- name: Ensure Docker & Docker Compose from Official Repo
+  block:
+    - name: Ensure required packages for apt repository are installed
+      apt:
+        name:
+          - ca-certificates
+          - curl
+        state: present
+        update_cache: yes
+
+    - name: Create /etc/apt/keyrings directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Add Docker official GPG key
+      get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+
+    - name: Get dpkg architecture
+      command: dpkg --print-architecture
+      register: dpkg_arch
+      changed_when: false
+
+    - name: Add Docker repository to Apt sources
+      copy:
+        content: |
+          Types: deb
+          URIs: https://download.docker.com/linux/ubuntu
+          Suites: {{ ansible_distribution_release }}
+          Components: stable
+          Architectures: {{ dpkg_arch.stdout }}
+          Signed-By: /etc/apt/keyrings/docker.asc
+        dest: /etc/apt/sources.list.d/docker.sources
+        mode: '0644'
+
+    - name: Install Docker components
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+  when: not docker_stat.stat.exists
+
 - name: Ensure Docker service is running
   systemd:
     name: docker
