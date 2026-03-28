@@ -22,6 +22,18 @@
         delay: 10
         timeout: 120
 
+    - name: Wait for Cloud-Init to finish completely
+      raw: cloud-init status --wait
+      changed_when: false
+      failed_when: false
+
+    - name: Wait for APT locks to be released
+      raw: |
+        while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1; do
+          sleep 5
+        done
+      changed_when: false
+
 - name: PHASE 1 - Preparation
   hosts: all
   become: true

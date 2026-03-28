@@ -5,6 +5,10 @@
       - keepalived
       - curl
     state: present
+  register: apt_result
+  until: apt_result is success
+  retries: 5
+  delay: 10
 
 - name: Render Keepalived configuration
   template:
