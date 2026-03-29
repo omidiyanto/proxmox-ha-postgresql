@@ -209,6 +209,14 @@ Disaster strikes? Accidental `DROP TABLE`? You can rewind your entire PostgreSQL
 
 ---
 
+## 🎥 Demo
+
+Check out the full demonstration of the automated deployment and Day-2 Operations (Failover, WAL-G Backups, PITR) here:
+
+[![Enterprise HA PostgreSQL Demo](https://img.youtube.com/vi/pNEiI7HSsRM/hqdefault.jpg)](https://youtu.be/pNEiI7HSsRM)
+
+---
+
 ## 🤝 How to Contribute
 
 This project is open-source, and I strongly believe in the power of community collaboration! Whether you are fixing an Ansible idempotency bug, improving the documentation, or proposing a massive architectural upgrade (like adding external AWS S3 support), your contributions are highly appreciated.
