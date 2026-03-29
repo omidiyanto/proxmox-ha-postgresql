@@ -104,14 +104,14 @@ If you need to change IP addresses, VM IDs, CPU cores, or the Virtual IP (VIP), 
 locals {
   haproxy_vip = "192.168.0.250" # Your Virtual IP
   nodes = {
-    "node01" = { id = 211, ip = "192.168.0.211", cores = 2, ram = 2048, disk = 30, group = "database" }
+    "node01" = { pve_node = "pve", id = 211, ip = "192.168.0.211", cores = 2, ram = 2048, disk = 30, group = "database" }
     # ... modify as needed ...
   }
 }
 ```
 
 ### Triggering the Pipeline
-The GitHub Actions workflow `.github/workflows/deploy.yaml` is configured to run automatically upon a `push` to the `master` branch (for paths inside `/terraform` and `/ansible`), or manually via `workflow_dispatch`.
+The GitHub Actions workflow `.github/workflows/deploy.yaml` is configured to run manually via `workflow_dispatch`, or automatically upon a `push` to the `master` branch (for paths inside `/terraform` and `/ansible`) if you enable it.
 
 1. Go to the **Actions** tab in GitHub.
 2. Select **Deploy HA PostgreSQL**.
